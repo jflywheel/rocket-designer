@@ -8,6 +8,8 @@ const RADIAL_SEGMENTS = 52   // smooth enough, fast to export
 const NOSE_HEIGHT = 58
 const BASE_HEIGHT = 22
 const FIN_OVERLAP = 0.8      // fins overlap body so slicer merges them as one solid
+const BORE_RADIUS = 8.5      // 17mm diameter bore fits over 1/2" CPVC (16.8mm OD)
+const BORE_DEPTH = 15        // 15mm deep socket
 
 // ─── Color Defaults ───
 const DEFAULT_COLORS = {
@@ -92,12 +94,29 @@ function buildTubeGeometry(height) {
   return new THREE.CylinderGeometry(BODY_RADIUS, BODY_RADIUS, height, RADIAL_SEGMENTS)
 }
 
-// Base: standard cylinder or tapered boat tail
-function buildBaseGeometry(type) {
-  if (type === 'Boat Tail') {
-    return new THREE.CylinderGeometry(BODY_RADIUS, BODY_RADIUS * 0.7, BASE_HEIGHT, RADIAL_SEGMENTS)
+// Base: standard or boat tail, optionally with a launch bore (hollow socket)
+// When bore is enabled, we use LatheGeometry with an annular cross-section
+function buildBaseGeometry(type, bore = false) {
+  const bottomRadius = type === 'Boat Tail' ? BODY_RADIUS * 0.7 : BODY_RADIUS
+
+  if (!bore) {
+    return new THREE.CylinderGeometry(BODY_RADIUS, bottomRadius, BASE_HEIGHT, RADIAL_SEGMENTS)
   }
-  return new THREE.CylinderGeometry(BODY_RADIUS, BODY_RADIUS, BASE_HEIGHT, RADIAL_SEGMENTS)
+
+  // Build a cross-section profile that creates a hollow base when revolved.
+  // Profile traces the outer wall down, across the bottom ring, up the bore, across the bore lip.
+  // LatheGeometry revolves Vector2(x=radius, y=height) around Y axis.
+  const H = BASE_HEIGHT
+  const points = [
+    new THREE.Vector2(BODY_RADIUS, H / 2),          // top outer edge
+    new THREE.Vector2(bottomRadius, -H / 2),         // bottom outer edge
+    new THREE.Vector2(BORE_RADIUS, -H / 2),          // bottom inner edge (bore opening)
+    new THREE.Vector2(BORE_RADIUS, -H / 2 + BORE_DEPTH), // top of bore cavity
+    new THREE.Vector2(0.001, -H / 2 + BORE_DEPTH),  // center at bore ceiling (tiny radius to close)
+    new THREE.Vector2(0.001, H / 2),                 // center at top
+  ]
+
+  return new THREE.LatheGeometry(points, RADIAL_SEGMENTS)
 }
 
 // Build a single fin as an extruded 2D shape
@@ -300,6 +319,7 @@ export default function App() {
   const [lowerBody, setLowerBody] = useState(1)
   const [fins, setFins] = useState('3-Fin Delta')
   const [base, setBase] = useState('Standard')
+  const [launchBore, setLaunchBore] = useState(false)
   const [colors, setColors] = useState(DEFAULT_COLORS)
 
   const canvasRef = useRef(null)
@@ -322,9 +342,9 @@ export default function App() {
     const group = new THREE.Group()
     let y = 0
 
-    // Base
-    const baseGeo = buildBaseGeometry(base)
-    const baseMesh = new THREE.Mesh(baseGeo, new THREE.MeshPhongMaterial({ color: colors.base }))
+    // Base (with optional launch bore for air pressure launching)
+    const baseGeo = buildBaseGeometry(base, launchBore)
+    const baseMesh = new THREE.Mesh(baseGeo, new THREE.MeshPhongMaterial({ color: colors.base, side: THREE.DoubleSide }))
     baseMesh.position.y = BASE_HEIGHT / 2
     baseMesh.userData.section = 'base'
     group.add(baseMesh)
@@ -380,7 +400,7 @@ export default function App() {
     group.position.y = -(y + NOSE_HEIGHT) / 2
 
     return group
-  }, [noseCone, upperBody, lowerBody, fins, base, colors])
+  }, [noseCone, upperBody, lowerBody, fins, base, launchBore, colors])
 
   // Set up Three.js scene once
   useEffect(() => {
@@ -616,13 +636,14 @@ export default function App() {
     readme += `Lower Body: ${LOWER_BODY_OPTIONS[lowerBody].label}\n`
     readme += `Fins: ${fins}\n`
     readme += `Base: ${base}\n`
+    readme += `Launch Bore: ${launchBore ? 'Yes (17mm, fits 1/2" CPVC)' : 'No (solid)'}\n`
     readme += `\nBody Diameter: 30mm\n`
     readme += `Print as solid, no supports needed.\n`
     readme += `Bambu Studio merges overlapping fin geometry automatically.\n`
 
     files.push({ name: 'README.txt', data: new TextEncoder().encode(readme) })
     downloadBlob(buildZip(files), 'rocket_design.zip', 'application/zip')
-  }, [getExportGeometries, mergeGeometries, noseCone, upperBody, lowerBody, fins, base, colors])
+  }, [getExportGeometries, mergeGeometries, noseCone, upperBody, lowerBody, fins, base, launchBore, colors])
 
   const totalHeight = BASE_HEIGHT + LOWER_BODY_OPTIONS[lowerBody].height + UPPER_BODY_OPTIONS[upperBody].height + NOSE_HEIGHT
 
@@ -663,6 +684,11 @@ export default function App() {
         {/* Base */}
         <Section label="Base" color={colors.base} onColor={c => setColor('base', c)}>
           <OptionGrid options={BASE_OPTIONS} value={base} onChange={setBase} />
+          <label className="toggle">
+            <input type="checkbox" checked={launchBore} onChange={e => setLaunchBore(e.target.checked)} />
+            <span>Launch Bore</span>
+            <span className="toggle-hint">17mm socket for 1/2" CPVC launch tube</span>
+          </label>
         </Section>
 
         <div className="stats">

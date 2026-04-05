@@ -99,6 +99,29 @@
   color: #fff;
 }
 
+/* ─── Toggle (checkbox) ─── */
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #ccc;
+  cursor: pointer;
+  padding: 6px 0;
+}
+
+.toggle input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: #6366f1;
+  cursor: pointer;
+}
+
+.toggle-hint {
+  font-size: 11px;
+  color: #666;
+}
+
 /* ─── Stats ─── */
 .stats {
   display: flex;
