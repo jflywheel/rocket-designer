@@ -1,0 +1,183 @@
+.app {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ─── Left Panel ─── */
+.panel {
+  width: 340px;
+  min-width: 340px;
+  background: #16162a;
+  border-right: 1px solid #2a2a4a;
+  padding: 24px 20px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.title {
+  font-size: 24px;
+  font-weight: 600;
+  color: #fff;
+  margin: 0;
+}
+
+.subtitle {
+  font-size: 13px;
+  color: #888;
+  margin-top: -8px;
+}
+
+/* ─── Section Groups ─── */
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.section-header label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #bbb;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.section-header input[type="color"] {
+  width: 28px;
+  height: 28px;
+  border: 2px solid #333;
+  border-radius: 6px;
+  cursor: pointer;
+  background: none;
+  padding: 0;
+}
+
+.section-header input[type="color"]::-webkit-color-swatch-wrapper {
+  padding: 2px;
+}
+
+.section-header input[type="color"]::-webkit-color-swatch {
+  border: none;
+  border-radius: 3px;
+}
+
+/* ─── Option Buttons ─── */
+.option-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.option-btn {
+  padding: 6px 12px;
+  font-size: 12px;
+  border: 1px solid #333;
+  border-radius: 6px;
+  background: #1e1e38;
+  color: #ccc;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.option-btn:hover {
+  background: #2a2a50;
+  border-color: #555;
+}
+
+.option-btn.active {
+  background: #3a3a6a;
+  border-color: #6366f1;
+  color: #fff;
+}
+
+/* ─── Stats ─── */
+.stats {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: #1e1e38;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #aaa;
+}
+
+/* ─── Export ─── */
+.export-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.export-btn {
+  width: 100%;
+  padding: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s;
+  background: #6366f1;
+  color: #fff;
+}
+
+.export-btn:hover {
+  background: #5558e6;
+}
+
+.export-btn.export-zip {
+  background: #1e1e38;
+  border: 1px solid #6366f1;
+  color: #6366f1;
+}
+
+.export-btn.export-zip:hover {
+  background: #2a2a50;
+}
+
+.hint {
+  font-size: 11px;
+  color: #555;
+  text-align: center;
+}
+
+/* ─── 3D Viewport ─── */
+.viewport {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}
+
+.viewport canvas {
+  width: 100% !important;
+  height: 100% !important;
+  display: block;
+}
+
+/* ─── Responsive: stack on small screens ─── */
+@media (max-width: 768px) {
+  .app {
+    flex-direction: column;
+  }
+
+  .panel {
+    width: 100%;
+    min-width: unset;
+    max-height: 50vh;
+    border-right: none;
+    border-bottom: 1px solid #2a2a4a;
+  }
+
+  .viewport {
+    min-height: 50vh;
+  }
+}
