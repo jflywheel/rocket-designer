@@ -140,10 +140,10 @@ function buildFinsGroup(style) {
     const finGeo = buildSingleFin(style)
     const finMesh = new THREE.Mesh(finGeo)
 
-    // Fin starts in XY plane, extruded in Z.
-    // Rotate so it stands vertical and faces outward
-    finMesh.rotation.x = -Math.PI / 2
-    finMesh.position.set(0, -17.5, BODY_RADIUS - FIN_OVERLAP) // center along root chord
+    // Fin shape: root chord along X, span along Y, extruded along Z.
+    // Rotate so root chord runs along rocket Y axis, span points outward radially.
+    finMesh.rotation.z = -Math.PI / 2
+    finMesh.position.set(BODY_RADIUS - FIN_OVERLAP, 35 / 2, -1) // root at body surface, centered vertically
 
     // Wrapper rotates around Y to space fins evenly
     const wrapper = new THREE.Group()
