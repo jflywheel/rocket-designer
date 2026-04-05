@@ -11,13 +11,20 @@ const FIN_OVERLAP = 0.8      // fins overlap body so slicer merges them as one s
 const BORE_RADIUS = 8.5      // 17mm diameter bore fits over 1/2" CPVC (16.8mm OD)
 const BORE_DEPTH = 15        // 15mm deep socket
 
-// ─── Color Defaults ───
+// ─── Bambu Basic PLA Palette (4 AMS slots) ───
+const BAMBU_COLORS = [
+  { name: 'Black', hex: '#000000' },
+  { name: 'White', hex: '#FFFFFF' },
+  { name: 'Red', hex: '#DA291C' },
+  { name: 'Blue', hex: '#0033A0' },
+]
+
 const DEFAULT_COLORS = {
-  nose: '#e74c3c',
-  upperBody: '#3498db',
-  lowerBody: '#2ecc71',
-  fins: '#f39c12',
-  base: '#9b59b6',
+  nose: '#DA291C',      // Red
+  upperBody: '#FFFFFF',  // White
+  lowerBody: '#FFFFFF',  // White
+  fins: '#000000',       // Black
+  base: '#0033A0',       // Blue
 }
 
 // ─── Part Options ───
@@ -296,6 +303,103 @@ function buildZip(files) {
   zipBuffer.set(new Uint8Array(eocd), pos)
 
   return zipBuffer
+}
+
+// ─── 3MF Builder ───
+// Builds a 3MF file (ZIP with XML) that Bambu Studio reads with colors pre-assigned.
+// Uses per-triangle basematerials so each rocket section gets its color automatically.
+
+function build3MF(sections, colorMap) {
+  // sections: { sectionName: [BufferGeometry] }
+  // colorMap: { sectionName: '#RRGGBB' }
+
+  // Collect unique colors and assign indices
+  const uniqueColors = [...new Set(Object.values(colorMap))]
+  const colorIdx = (hex) => uniqueColors.indexOf(hex)
+
+  // Merge all section geometries into one vertex + triangle list
+  const vertices = []
+  const triangles = []
+  let vOffset = 0
+
+  for (const [section, geos] of Object.entries(sections)) {
+    const cIdx = colorIdx(colorMap[section])
+    for (const geo of geos) {
+      const ni = geo.index ? geo.toNonIndexed() : geo
+      const pos = ni.attributes.position.array
+      const count = pos.length / 3
+
+      for (let i = 0; i < count; i++) {
+        vertices.push(pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2])
+      }
+      for (let i = 0; i < count; i += 3) {
+        triangles.push(vOffset + i, vOffset + i + 1, vOffset + i + 2, cIdx)
+      }
+      vOffset += count
+    }
+  }
+
+  // Build basematerials XML (color definitions)
+  const baseMats = uniqueColors.map(hex => {
+    const bc = BAMBU_COLORS.find(c => c.hex === hex)
+    return `   <base name="${bc ? bc.name : 'Color'}" displaycolor="${hex}FF"/>`
+  }).join('\n')
+
+  // Build vertices XML
+  const verts = []
+  for (let i = 0; i < vertices.length; i += 3) {
+    verts.push(`     <vertex x="${vertices[i]}" y="${vertices[i + 1]}" z="${vertices[i + 2]}"/>`)
+  }
+
+  // Build triangles XML with per-triangle color (pid=basematerials group, p1=color index)
+  const tris = []
+  for (let i = 0; i < triangles.length; i += 4) {
+    tris.push(`     <triangle v1="${triangles[i]}" v2="${triangles[i + 1]}" v3="${triangles[i + 2]}" pid="1" p1="${triangles[i + 3]}"/>`)
+  }
+
+  // Main model XML
+  // Transform rotates from Three.js Y-up to 3MF Z-up (90deg around X)
+  const modelXml = `<?xml version="1.0" encoding="UTF-8"?>
+<model unit="millimeter" xml:lang="en-US"
+  xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02">
+ <resources>
+  <basematerials id="1">
+${baseMats}
+  </basematerials>
+  <object id="2" type="model" pid="1" pindex="0">
+   <mesh>
+    <vertices>
+${verts.join('\n')}
+    </vertices>
+    <triangles>
+${tris.join('\n')}
+    </triangles>
+   </mesh>
+  </object>
+ </resources>
+ <build>
+  <item objectid="2" transform="1 0 0 0 0 1 0 -1 0 0 0 0"/>
+ </build>
+</model>`
+
+  // Package metadata files
+  const contentTypes = `<?xml version="1.0" encoding="UTF-8"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+ <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+ <Default Extension="model" ContentType="application/vnd.ms-package.3dmanufacturing-3dmodel+xml"/>
+</Types>`
+
+  const rels = `<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+ <Relationship Target="/3D/3dmodel.model" Id="rel-1" Type="http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel"/>
+</Relationships>`
+
+  const enc = new TextEncoder()
+  return buildZip([
+    { name: '[Content_Types].xml', data: enc.encode(contentTypes) },
+    { name: '_rels/.rels', data: enc.encode(rels) },
+    { name: '3D/3dmodel.model', data: enc.encode(modelXml) },
+  ])
 }
 
 // ─── Download Helper ───
@@ -645,6 +749,12 @@ export default function App() {
     downloadBlob(buildZip(files), 'rocket_design.zip', 'application/zip')
   }, [getExportGeometries, mergeGeometries, noseCone, upperBody, lowerBody, fins, base, launchBore, colors])
 
+  const handleExport3MF = useCallback(() => {
+    const sections = getExportGeometries()
+    const data = build3MF(sections, colors)
+    downloadBlob(data, 'rocket.3mf', 'application/vnd.ms-package.3dmanufacturing-3dmodel+xml')
+  }, [getExportGeometries, colors])
+
   const totalHeight = BASE_HEIGHT + LOWER_BODY_OPTIONS[lowerBody].height + UPPER_BODY_OPTIONS[upperBody].height + NOSE_HEIGHT
 
   return (
@@ -697,11 +807,11 @@ export default function App() {
         </div>
 
         <div className="export-section">
-          <button className="export-btn" onClick={handleExportSingle}>
-            Export Single STL
+          <button className="export-btn" onClick={handleExport3MF}>
+            Export 3MF (Multi-Color)
           </button>
-          <button className="export-btn export-zip" onClick={handleExportZip}>
-            Export ZIP (Multi-Color)
+          <button className="export-btn export-alt" onClick={handleExportSingle}>
+            Export Single STL
           </button>
         </div>
 
@@ -722,7 +832,17 @@ function Section({ label, color, onColor, children }) {
     <div className="section">
       <div className="section-header">
         <label>{label}</label>
-        <input type="color" value={color} onChange={e => onColor(e.target.value)} />
+        <div className="color-swatches">
+          {BAMBU_COLORS.map(bc => (
+            <button
+              key={bc.hex}
+              className={`swatch ${color === bc.hex ? 'active' : ''}`}
+              style={{ background: bc.hex }}
+              onClick={() => onColor(bc.hex)}
+              title={bc.name}
+            />
+          ))}
+        </div>
       </div>
       {children}
     </div>
